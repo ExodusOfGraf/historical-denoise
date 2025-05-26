@@ -16,7 +16,7 @@ def process_single_file(input_audio_path, output_audio_dir, args, unet_model):
     import scipy.signal
     from tqdm import tqdm # Можно убрать tqdm для пакетной обработки или оставить
 
-    logger.info(f"Processing file: {input_audio_path}")
+    logger.info(f"Обработка файла: {input_audio_path}")
     os.makedirs(output_audio_dir, exist_ok=True)
 
     def do_stft(noisy):
@@ -35,19 +35,18 @@ def process_single_file(input_audio_path, output_audio_dir, args, unet_model):
         pred_cpx=data[...,0] + 1j * data[...,1]
         pred_time=tf.signal.inverse_stft(pred_cpx, win_size, hop_size, window_fn=inv_window_fn)
         return pred_time
-
     try:
-    data, samplerate = sf.read(input_audio_path)
+        data, samplerate = sf.read(input_audio_path)
     except Exception as e:
-        logger.error(f"Could not read input file {input_audio_path}: {e}")
+        logger.error(f"Не удалось прочитать входной файл {input_audio_path}: {e}")
         return
 
-    #Stereo to mono
+    #Стерео в моно
     if len(data.shape)>1:
         data=np.mean(data,axis=1)
     
     if samplerate!=44100: 
-        logger.info(f"Resampling {input_audio_path} from {samplerate} Hz to 44100 Hz")
+        logger.info(f"Изменение частоты дискретизации файла {input_audio_path} с {samplerate} Гц на 44100 Гц")
         data=scipy.signal.resample(data, int((44100  / samplerate )*len(data))+1)  
  
     segment_size=44100*5  #5s segments
@@ -62,14 +61,14 @@ def process_single_file(input_audio_path, output_audio_dir, args, unet_model):
     numchunks=int(np.ceil(length_data/segment_size))
     pointer = 0
      
-    for i in tqdm(range(numchunks), desc=f"Denoising {os.path.basename(input_audio_path)}"):
+    for i in tqdm(range(numchunks), desc=f"Подавление шума в {os.path.basename(input_audio_path)}"):
         current_segment_data = data[pointer : pointer + segment_size]
         is_last_chunk = (pointer + segment_size >= length_data)
 
         if is_last_chunk:
             actual_segment_length = len(current_segment_data)
             padded_segment_data = np.pad(current_segment_data, (0, segment_size - actual_segment_length), 'constant')
-            else:
+        else:
             padded_segment_data = current_segment_data
             actual_segment_length = segment_size
 
@@ -115,7 +114,7 @@ def process_single_file(input_audio_path, output_audio_dir, args, unet_model):
         else:
             pointer += actual_segment_length # Переход к концу файла
 
-    # Сохраняем оригинальный (возможно ресемплированный и сведенный в моно) вход
+    # Сохраняем оригинальный  вход
     noisy_input_path = os.path.join(output_audio_dir, "noisy_input.wav")
     sf.write(noisy_input_path, data, 44100)
     logger.info(f"Сохранен исходный входной файл (моно, 44.1кГц): {noisy_input_path}")
@@ -138,7 +137,7 @@ def run(args):
     ckpt_path=os.path.join(os.path.dirname(os.path.abspath(__file__)),path_experiment, 'checkpoint')
 
     if not os.path.exists(ckpt_path + '.index'):
-         logger.error(f"Checkpoint file not found at {ckpt_path}. Make sure models are downloaded and unzipped correctly.")
+         logger.error(f"Файл контрольной точки не найден по адресу {ckpt_path}. Убедитесь, что модели загружены и распакованы правильно.")
          os._exit(1)
 
     unet_model = unet.build_model_denoise(unet_args=args.unet)
@@ -151,10 +150,10 @@ def run(args):
         input_files.extend(glob.glob(os.path.join(CONTAINER_INPUT_DIR, f"*{ext.upper()}")))
 
     if not input_files:
-        logger.warning(f"No audio files found in {CONTAINER_INPUT_DIR}")
+        logger.warning(f"Аудиофайлы не найдены в директории {CONTAINER_INPUT_DIR}")
         return
 
-    logger.info(f"Found {len(input_files)} files to process: {input_files}")
+    logger.info(f"Найдено {len(input_files)} файлов для обработки: {input_files}")
 
     for input_file_path in input_files:
         filename_stem = os.path.splitext(os.path.basename(input_file_path))[0]
@@ -163,7 +162,7 @@ def run(args):
         try:
             process_single_file(input_file_path, output_file_specific_dir, args, unet_model)
         except Exception as e:
-            logger.error(f"Error processing file {input_file_path}: {e}", exc_info=True)
+            logger.error(f"Ошибка при обработке файла {input_file_path}: {e}", exc_info=True)
 
 def _main(args):
     global __file__
@@ -175,7 +174,7 @@ def main(args):
     try:
         _main(args)
     except Exception:
-        logger.exception("Some error happened")
+        logger.exception("Произошла ошибка")
         os._exit(1)
 
 if __name__ == "__main__":
